@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   neo4j:
     image: neo4j:5-community
@@ -8,35 +6,40 @@ services:
       - "7687:7687"
       - "7474:7474"
     environment:
-      NEO4J_AUTH: neo4j/argus_devops_2026
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-argus_devops_2026}
+      NEO4J_dbms_memory_pagecache_size: 512M
+      NEO4J_dbms_memory_heap_initial__size: 512M
+      NEO4J_dbms_memory_heap_max__size: 1G
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
       - ./migrations:/migrations
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p argus_devops_2026 'RETURN 1' || exit 1"]
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p ${NEO4J_PASSWORD:-argus_devops_2026} 'RETURN 1' || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
   argus-server:
-    build:
-      context: ../server
-      dockerfile: Dockerfile
+    image: ghcr.io/alihamza400/argus_devops:latest
     container_name: argus-server
+    pull_policy: always
     ports:
       - "8000:8000"
     environment:
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: argus_devops_2026
-      ARGUS_ENV: development
+      ARGUS_NEO4J_URI: bolt://neo4j:7687
+      ARGUS_NEO4J_USER: neo4j
+      ARGUS_NEO4J_PASSWORD: ${NEO4J_PASSWORD:-argus_devops_2026}
+      ARGUS_NEO4J_DATABASE: neo4j
+      ARGUS_ENV: ${ARGUS_ENV:-production}
+      ARGUS_GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      ARGUS_K8S_WATCHER_ENABLED: ${K8S_WATCHER_ENABLED:-false}
+      ARGUS_K8S_WATCHER_NAMESPACE: ${K8S_WATCHER_NAMESPACE:-}
     depends_on:
       neo4j:
         condition: service_healthy
-    volumes:
-      - ../server:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
 
 volumes:
   neo4j_data:

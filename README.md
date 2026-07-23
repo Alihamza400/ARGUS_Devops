@@ -1,9 +1,11 @@
 # ARGUS
 
 [![CI](https://github.com/Alihamza400/ARGUS_Devops/actions/workflows/ci.yml/badge.svg)](https://github.com/Alihamza400/ARGUS_Devops/actions/workflows/ci.yml)
+[![Docker](https://github.com/Alihamza400/ARGUS_Devops/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/Alihamza400/ARGUS_Devops/actions/workflows/docker-publish.yml)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
-[![Tests](https://img.shields.io/badge/tests-208%20passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-221%20passing-brightgreen.svg)](#)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](#)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue?logo=docker)](https://github.com/Alihamza400/ARGUS_Devops/pkgs/container/argus_devops)
 
 **A shared-context coordination layer for DevOps agents.**
 
@@ -46,22 +48,21 @@ Three steps:
 ## Quick Start
 
 ```bash
-# 1. Start Neo4j
+# 1. Start ARGUS + Neo4j (Docker images auto-pulled from GHCR)
 docker compose -f deployments/docker-compose.yml up -d
 
-# 2. Install and migrate
-cd server && pip install -r requirements.txt
+# 2. Run schema migrations
 curl -X POST http://localhost:8000/graph/schema/migrate
 
 # 3. Ingest your repo
-python scripts/run_adapters.py git /path/to/repo --name my-app
+docker exec argus-server python scripts/run_adapters.py git /path/to/repo --name my-app
 
 # 4. Analyze a failing pod
-python scripts/run_agent.py analyze --pod-id pod-crash-xyz --proposal
+docker exec argus-server python scripts/run_agent.py analyze --pod-id pod-crash-xyz --proposal
 
 # 5. Review and execute
-python scripts/run_gate.py approve <proposal-id> --reviewer alice
-python scripts/run_enforcer.py execute <proposal-id>
+docker exec argus-server python scripts/run_gate.py approve <proposal-id> --reviewer alice
+docker exec argus-server python scripts/run_enforcer.py execute <proposal-id>
 ```
 
 ---
@@ -71,47 +72,47 @@ python scripts/run_enforcer.py execute <proposal-id>
 ### Ingest data
 ```bash
 # Git repos
-python scripts/run_adapters.py git ./my-repo --name my-app
+docker exec argus-server python scripts/run_adapters.py git /path/to/repo --name my-app
 
 # Kubernetes clusters
-python scripts/run_adapters.py k8s --cluster-name prod
+docker exec argus-server python scripts/run_adapters.py k8s --cluster-name prod
 
 # GitHub Actions
-python scripts/run_adapters.py github --owner my-org --repo my-app --token ghp_...
+docker exec argus-server python scripts/run_adapters.py github --owner my-org --repo my-app --token ghp_...
 ```
 
 ### Analyze incidents
 ```bash
 # Analyze a pod by ID
-python scripts/run_agent.py analyze --pod-id pod-crash-xyz
+docker exec argus-server python scripts/run_agent.py analyze --pod-id pod-crash-xyz
 
 # Analyze and generate a rollback proposal
-python scripts/run_agent.py analyze --pod-id pod-crash-xyz --proposal
+docker exec argus-server python scripts/run_agent.py analyze --pod-id pod-crash-xyz --proposal
 
 # Find all unhealthy pods
-python scripts/run_agent.py unhealthy
+docker exec argus-server python scripts/run_agent.py unhealthy
 ```
 
 ### Review and approve
 ```bash
 # List pending proposals
-python scripts/run_gate.py list
+docker exec argus-server python scripts/run_gate.py list
 
 # View proposal details with evidence
-python scripts/run_gate.py view <proposal-id>
+docker exec argus-server python scripts/run_gate.py view <proposal-id>
 
 # Approve or reject
-python scripts/run_gate.py approve <proposal-id> --reviewer alice
-python scripts/run_gate.py reject <proposal-id> --reviewer bob --comment "Need more evidence"
+docker exec argus-server python scripts/run_gate.py approve <proposal-id> --reviewer alice
+docker exec argus-server python scripts/run_gate.py reject <proposal-id> --reviewer bob --comment "Need more evidence"
 ```
 
 ### Execute approved changes
 ```bash
 # Preview without executing
-python scripts/run_enforcer.py execute <proposal-id> --dry-run
+docker exec argus-server python scripts/run_enforcer.py execute <proposal-id> --dry-run
 
 # Execute
-python scripts/run_enforcer.py execute <proposal-id>
+docker exec argus-server python scripts/run_enforcer.py execute <proposal-id>
 ```
 
 ---
@@ -121,11 +122,11 @@ python scripts/run_enforcer.py execute <proposal-id>
 A pod is in `CrashLoopBackOff`. Here's the full workflow:
 
 ```bash
-# 1. Find the pod
-python scripts/run_agent.py unhealthy
+# 1. Find unhealthy pods
+docker exec argus-server python scripts/run_agent.py unhealthy
 
-# 2. Analyze it (traces through services, repos, commits, pipelines)
-python scripts/run_agent.py analyze --pod-name api-gateway --proposal
+# 2. Analyze and generate rollback proposal
+docker exec argus-server python scripts/run_agent.py analyze --pod-name api-gateway --proposal
 
 # Output:
 # ARGUS ANALYSIS [CRITICAL] (100% confidence)
@@ -137,13 +138,13 @@ python scripts/run_agent.py analyze --pod-name api-gateway --proposal
 # PROPOSAL: [Argus] Rollback api-service — Fix OOM in handler
 
 # 3. View the proposal with evidence
-python scripts/run_gate.py view <proposal-id>
+docker exec argus-server python scripts/run_gate.py view <proposal-id>
 
 # 4. Approve it
-python scripts/run_gate.py approve <proposal-id> --reviewer alice
+docker exec argus-server python scripts/run_gate.py approve <proposal-id> --reviewer alice
 
 # 5. Execute the rollback
-python scripts/run_enforcer.py execute <proposal-id>
+docker exec argus-server python scripts/run_enforcer.py execute <proposal-id>
 ```
 
 ---
@@ -182,15 +183,46 @@ server/
 
 ---
 
+## Deployment
+
+### One-command start
+
+```bash
+docker compose -f deployments/docker-compose.yml up -d
+```
+
+Images are pulled from `ghcr.io/alihamza400/argus_devops`. No local build needed.
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `NEO4J_PASSWORD` | `argus_devops_2026` | Neo4j database password |
+| `ARGUS_ENV` | `production` | Runtime environment |
+| `ARGUS_GITHUB_WEBHOOK_SECRET` | (empty) | HMAC secret for GitHub webhook verification |
+| `ARGUS_K8S_WATCHER_ENABLED` | `false` | Enable automatic K8s pod crash detection |
+| `ARGUS_K8S_WATCHER_NAMESPACE` | (all) | Restrict K8s watcher to a specific namespace |
+
+### Run without Docker
+
+```bash
+cd server
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+---
+
 ## Tech Stack
 
-Python 3.12+ · FastAPI · Neo4j 5.x · Pydantic v2 · Docker
+Python 3.12+ · FastAPI · Neo4j 5.x · Pydantic v2 · Docker · GitHub Container Registry
 
 ---
 
 ## Status
 
-All 8 core phases are complete — 208 tests passing on every commit via CI/CD pipeline.
+All 8 core phases are complete — 221 tests passing on every commit via CI/CD pipeline. Docker images published to GHCR on every push.
 
 ---
 
