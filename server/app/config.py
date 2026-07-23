@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     k8s_watcher_namespace: str = ""
     k8s_watcher_interval_seconds: int = 30
     k8s_kubeconfig_path: str = ""
+    argus_log_level: str = "INFO"
 
     model_config = {"env_prefix": "argus_"}
 

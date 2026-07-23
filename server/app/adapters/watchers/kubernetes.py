@@ -12,6 +12,10 @@ from app.agents.models import AgentQuery
 from app.config import settings
 from app.graph.connection import Neo4jConnection
 from app.graph.schema import NodeType, EdgeType
+from app.monitoring.logging import get_logger
+from app.monitoring.metrics import watcher_events
+
+logger = get_logger("argus.watcher")
 
 
 class K8sWatcher:
@@ -65,9 +69,9 @@ class K8sWatcher:
 
             except ApiException as e:
                 if e.status != 504:
-                    print(f"K8s watcher API error: {e}")
+                    logger.error("K8s watcher API error", extra={"status": e.status, "error": str(e)})
             except Exception as e:
-                print(f"K8s watcher error: {e}")
+                logger.error("K8s watcher error", extra={"error": str(e)})
 
             await asyncio.sleep(1)
 
@@ -85,6 +89,7 @@ class K8sWatcher:
         if reason not in self.UNHEALTHY_PHASES:
             return
 
+        watcher_events.labels(type="pod_crash", status="detected").inc()
         incident_id = f"inc-{pod_namespace}-{pod_name}-{datetime.utcnow().timestamp():.0f}"
         existing = await Neo4jConnection.run_query(
             "MATCH (n:Incident {id: $id}) RETURN n LIMIT 1",
@@ -141,7 +146,7 @@ class K8sWatcher:
                 "proposal": analysis.proposal.title if analysis.proposal else None,
             }
         except Exception as e:
-            print(f"Auto-analysis failed for {incident_id}: {e}")
+            logger.error("Auto-analysis failed", extra={"incident_id": incident_id, "error": str(e)})
             return {"incident_id": incident_id, "error": str(e)}
 
     async def start(self):
@@ -149,7 +154,7 @@ class K8sWatcher:
             return
         self._running = True
         self._watch_task = asyncio.create_task(self.watch_pods())
-        print("K8s watcher started")
+        logger.info("K8s watcher started")
 
     async def stop(self):
         self._running = False
@@ -160,7 +165,7 @@ class K8sWatcher:
             except asyncio.CancelledError:
                 pass
             self._watch_task = None
-        print("K8s watcher stopped")
+        logger.info("K8s watcher stopped")
 
 
 k8s_watcher = K8sWatcher()
