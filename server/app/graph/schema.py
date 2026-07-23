@@ -11,6 +11,8 @@ class NodeType(str, Enum):
     NAMESPACE = "Namespace"
     CLUSTER = "Cluster"
     PIPELINE_RUN = "PipelineRun"
+    INCIDENT = "Incident"
+    RELEASE = "Release"
     SECURITY_FINDING = "SecurityFinding"
     COST_REPORT = "CostReport"
 
@@ -27,6 +29,7 @@ class EdgeType(str, Enum):
     AFFECTS = "AFFECTS"
     CHARGES = "CHARGES"
     PRODUCES = "PRODUCES"
+    DETECTED_IN = "DETECTED_IN"
 
 
 NODE_PROPERTIES: dict[NodeType, dict[str, str]] = {
@@ -97,6 +100,23 @@ NODE_PROPERTIES: dict[NodeType, dict[str, str]] = {
         "started_at": "datetime",
         "duration_seconds": "integer",
     },
+    NodeType.RELEASE: {
+        "id": "string",
+        "tag": "string",
+        "name": "string",
+        "author": "string",
+        "published_at": "datetime",
+    },
+    NodeType.INCIDENT: {
+        "id": "string",
+        "type": "string",
+        "severity": "string",
+        "status": "string",
+        "message": "string",
+        "source": "string",
+        "detected_at": "datetime",
+        "resolved_at": "datetime",
+    },
     NodeType.SECURITY_FINDING: {
         "id": "string",
         "type": "string",
@@ -126,6 +146,7 @@ EDGE_PROPERTIES: dict[EdgeType, dict[str, str]] = {
     EdgeType.AFFECTS: {"detected_at": "datetime", "status": "string"},
     EdgeType.CHARGES: {"amount": "float", "period": "string"},
     EdgeType.PRODUCES: {"at": "datetime"},
+    EdgeType.DETECTED_IN: {"detected_at": "datetime", "resolved_at": "datetime"},
 }
 
 
@@ -155,6 +176,10 @@ VALID_EDGE_PAIRS: dict[EdgeType, list[tuple[NodeType, NodeType]]] = {
         (NodeType.COST_REPORT, NodeType.NAMESPACE),
     ],
     EdgeType.PRODUCES: [(NodeType.PIPELINE_RUN, NodeType.DEPLOYMENT)],
+    EdgeType.DETECTED_IN: [
+        (NodeType.INCIDENT, NodeType.POD),
+        (NodeType.INCIDENT, NodeType.SERVICE),
+    ],
 }
 
 
@@ -169,6 +194,8 @@ CREATE CONSTRAINT pod_id IF NOT EXISTS FOR (n:Pod) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT namespace_id IF NOT EXISTS FOR (n:Namespace) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT cluster_id IF NOT EXISTS FOR (n:Cluster) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT pipeline_run_id IF NOT EXISTS FOR (n:PipelineRun) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT incident_id IF NOT EXISTS FOR (n:Incident) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT release_id IF NOT EXISTS FOR (n:Release) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT security_finding_id IF NOT EXISTS FOR (n:SecurityFinding) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT cost_report_id IF NOT EXISTS FOR (n:CostReport) REQUIRE n.id IS UNIQUE;
 

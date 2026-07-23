@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     argus_env: str = "development"
     app_name: str = "Argus"
     app_version: str = "0.1.0"
+    github_webhook_secret: str = ""
+    k8s_watcher_enabled: bool = False
+    k8s_watcher_namespace: str = ""
+    k8s_watcher_interval_seconds: int = 30
+    k8s_kubeconfig_path: str = ""
 
     model_config = {"env_prefix": "argus_"}
 
