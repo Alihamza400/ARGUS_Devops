@@ -1,20 +1,21 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.agents.coordinator import AgentCoordinator
 from app.agents.models import AgentQuery, AgentResponse
+from app.auth.dependencies import require_engineer, require_viewer
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 
 @router.get("/agents")
-async def list_agents():
+async def list_agents(current_user: dict = Depends(require_viewer)):
     return {"agents": AgentCoordinator.list_agents()}
 
 
 @router.post("/analyze", response_model=AgentResponse)
-async def analyze(query: AgentQuery):
+async def analyze(query: AgentQuery, current_user: dict = Depends(require_engineer)):
     if not query.pod_id and not query.pod_name and not query.service_name:
         raise HTTPException(
             status_code=400,
@@ -28,6 +29,7 @@ async def analyze_pod(
     pod_id: str,
     generate_proposal: bool = False,
     max_commits: int = 20,
+    current_user: dict = Depends(require_engineer),
 ):
     query = AgentQuery(
         query=f"Analyze pod {pod_id}",
@@ -39,7 +41,7 @@ async def analyze_pod(
 
 
 @router.get("/unhealthy")
-async def list_unhealthy(limit: int = 20):
+async def list_unhealthy(limit: int = 20, current_user: dict = Depends(require_viewer)):
     from app.agents.queries import GraphQueries
 
     pods = await GraphQueries.get_unhealthy_pods(limit=limit)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
 
 from app.coordinator.analyzer import ConflictAnalyzer
 from app.coordinator.coordinator import ConflictCoordinator
@@ -546,15 +545,8 @@ class TestConflictCoordinator:
 # API Endpoint Tests
 # ---------------------------------------------------------------------------
 
-@pytest_asyncio.fixture
-async def client():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-
-
 @pytest.mark.asyncio
-async def test_api_submit_proposal(client: AsyncClient):
+async def test_api_submit_proposal(client: AsyncClient, auth_headers: dict):
     response = await client.post(
         "/coordinator/proposals",
         json={
@@ -569,6 +561,7 @@ async def test_api_submit_proposal(client: AsyncClient):
             "evidence_count": 3,
             "confidence": 0.8,
         },
+        headers=auth_headers,
     )
     assert response.status_code == 200
     data = response.json()
@@ -578,19 +571,20 @@ async def test_api_submit_proposal(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_api_submit_proposal_missing_target(client: AsyncClient):
+async def test_api_submit_proposal_missing_target(client: AsyncClient, auth_headers: dict):
     response = await client.post(
         "/coordinator/proposals",
         json={"agent": "test", "action": "rollback"},
+        headers=auth_headers,
     )
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
-async def test_api_get_proposal(client: AsyncClient):
+async def test_api_get_proposal(client: AsyncClient, auth_headers: dict):
     await _seed_proposal(id="api-get-1")
 
-    response = await client.get("/coordinator/proposals/api-get-1")
+    response = await client.get("/coordinator/proposals/api-get-1", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == "api-get-1"
@@ -598,24 +592,24 @@ async def test_api_get_proposal(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_api_get_proposal_not_found(client: AsyncClient):
-    response = await client.get("/coordinator/proposals/nonexistent")
+async def test_api_get_proposal_not_found(client: AsyncClient, auth_headers: dict):
+    response = await client.get("/coordinator/proposals/nonexistent", headers=auth_headers)
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_api_list_proposals(client: AsyncClient):
+async def test_api_list_proposals(client: AsyncClient, auth_headers: dict):
     await _seed_proposal(id="api-list-1", target_id="svc-list")
     await _seed_proposal(id="api-list-2", target_id="svc-list")
 
-    response = await client.get("/coordinator/proposals?resource_id=svc-list")
+    response = await client.get("/coordinator/proposals?resource_id=svc-list", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["count"] == 2
 
 
 @pytest.mark.asyncio
-async def test_api_list_conflicts(client: AsyncClient):
+async def test_api_list_conflicts(client: AsyncClient, auth_headers: dict):
     await _seed_proposal(id="api-conf-a")
     await _seed_proposal(id="api-conf-b")
     c = ConflictRecord(
@@ -626,25 +620,25 @@ async def test_api_list_conflicts(client: AsyncClient):
     )
     await ProposalStore.create_conflict(c)
 
-    response = await client.get("/coordinator/conflicts")
+    response = await client.get("/coordinator/conflicts", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["count"] >= 1
 
 
 @pytest.mark.asyncio
-async def test_api_resource_summary(client: AsyncClient):
+async def test_api_resource_summary(client: AsyncClient, auth_headers: dict):
     await _seed_proposal(id="api-sum-a", target_id="svc-summary")
     await _seed_proposal(id="api-sum-b", target_id="svc-summary")
 
-    response = await client.get("/coordinator/resources/svc-summary/summary")
+    response = await client.get("/coordinator/resources/svc-summary/summary", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["active_proposals"] >= 2
 
 
 @pytest.mark.asyncio
-async def test_api_acquire_lock(client: AsyncClient):
+async def test_api_acquire_lock(client: AsyncClient, auth_headers: dict):
     await _seed_proposal(id="api-lock-prop", target_id="svc-lock")
 
     response = await client.post(
@@ -655,6 +649,7 @@ async def test_api_acquire_lock(client: AsyncClient):
             "proposal_id": "api-lock-prop",
             "agent": "test-agent",
         },
+        headers=auth_headers,
     )
     assert response.status_code == 200
     data = response.json()
@@ -662,7 +657,7 @@ async def test_api_acquire_lock(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_api_release_lock(client: AsyncClient):
+async def test_api_release_lock(client: AsyncClient, auth_headers: dict):
     await _seed_proposal(id="api-rel-prop", target_id="svc-rel")
     await ConflictCoordinator.acquire_proposal_lock(
         "svc-rel", ResourceType.SERVICE, "api-rel-prop", "test-agent",
@@ -671,6 +666,7 @@ async def test_api_release_lock(client: AsyncClient):
     response = await client.post(
         "/coordinator/locks/release",
         params={"resource_id": "svc-rel", "proposal_id": "api-rel-prop"},
+        headers=auth_headers,
     )
     assert response.status_code == 200
     data = response.json()
@@ -678,8 +674,8 @@ async def test_api_release_lock(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_api_coordinator_health(client: AsyncClient):
-    response = await client.get("/coordinator/health")
+async def test_api_coordinator_health(client: AsyncClient, auth_headers: dict):
+    response = await client.get("/coordinator/health", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert "status" in data

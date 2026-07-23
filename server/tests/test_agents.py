@@ -404,25 +404,17 @@ async def test_coordinator_analyze_with_proposal(populated_graph):
 # API Endpoint Tests
 # =========================================================================
 
-
-@pytest_asyncio.fixture
-async def client():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-
-
 @pytest.mark.asyncio
-async def test_api_list_agents(client: AsyncClient):
-    response = await client.get("/agent/agents")
+async def test_api_list_agents(client: AsyncClient, auth_headers: dict):
+    response = await client.get("/agent/agents", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data["agents"]) >= 2
 
 
 @pytest.mark.asyncio
-async def test_api_analyze_pod(client: AsyncClient, populated_graph):
-    response = await client.get("/agent/analyze/pod-api-crash")
+async def test_api_analyze_pod(client: AsyncClient, auth_headers: dict, populated_graph):
+    response = await client.get("/agent/analyze/pod-api-crash", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["analysis"]["severity"] in ("critical", "high", "medium", "low", "info")
@@ -430,8 +422,8 @@ async def test_api_analyze_pod(client: AsyncClient, populated_graph):
 
 
 @pytest.mark.asyncio
-async def test_api_analyze_pod_with_proposal(client: AsyncClient, populated_graph):
-    response = await client.get("/agent/analyze/pod-api-crash?generate_proposal=true")
+async def test_api_analyze_pod_with_proposal(client: AsyncClient, auth_headers: dict, populated_graph):
+    response = await client.get("/agent/analyze/pod-api-crash?generate_proposal=true", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["proposal"] is not None
@@ -439,9 +431,10 @@ async def test_api_analyze_pod_with_proposal(client: AsyncClient, populated_grap
 
 
 @pytest.mark.asyncio
-async def test_api_analyze_post(client: AsyncClient, populated_graph):
+async def test_api_analyze_post(client: AsyncClient, auth_headers: dict, populated_graph):
     response = await client.post(
         "/agent/analyze",
+        headers=auth_headers,
         json={
             "query": "Analyze crashloop",
             "pod_id": "pod-api-crash",
@@ -456,17 +449,18 @@ async def test_api_analyze_post(client: AsyncClient, populated_graph):
 
 
 @pytest.mark.asyncio
-async def test_api_analyze_no_pod_id(client: AsyncClient):
+async def test_api_analyze_no_pod_id(client: AsyncClient, auth_headers: dict):
     response = await client.post(
         "/agent/analyze",
+        headers=auth_headers,
         json={"query": "empty"},
     )
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
-async def test_api_list_unhealthy(client: AsyncClient, populated_graph):
-    response = await client.get("/agent/unhealthy")
+async def test_api_list_unhealthy(client: AsyncClient, auth_headers: dict, populated_graph):
+    response = await client.get("/agent/unhealthy", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["count"] >= 2

@@ -207,8 +207,8 @@ async def test_github_missing_event_header(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_webhook_verify_endpoint(client: AsyncClient):
-    response = await client.get("/webhooks/github/verify")
+async def test_webhook_verify_endpoint(client: AsyncClient, auth_headers: dict):
+    response = await client.get("/webhooks/github/verify", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert "secret_configured" in data

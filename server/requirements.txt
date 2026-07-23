@@ -10,4 +10,5 @@ pytest-asyncio==0.24.0
 pytest-cov==5.0.0
 gitpython==3.1.43
 kubernetes==36.0.3
+PyJWT==2.9.0
 ruff==0.6.4

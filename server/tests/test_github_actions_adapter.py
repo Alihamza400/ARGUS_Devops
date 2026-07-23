@@ -560,7 +560,7 @@ async def client():
 
 
 @pytest.mark.asyncio
-async def test_api_sync_github_endpoint(client: AsyncClient, graph_with_commits):
+async def test_api_sync_github_endpoint(client: AsyncClient, graph_with_commits, auth_headers: dict):
     with patch("app.adapters.github_actions.adapter.GitHubClient") as MockClient:
         mock_instance = MagicMock()
         mock_instance.list_workflow_runs = AsyncMock(
@@ -575,6 +575,7 @@ async def test_api_sync_github_endpoint(client: AsyncClient, graph_with_commits)
                 "repo_name": "repo",
                 "token": "test-token",
             },
+            headers=auth_headers,
         )
         assert response.status_code == 200
         data = response.json()
@@ -583,10 +584,11 @@ async def test_api_sync_github_endpoint(client: AsyncClient, graph_with_commits)
 
 
 @pytest.mark.asyncio
-async def test_api_sync_github_endpoint_no_token_still_succeeds(client: AsyncClient):
+async def test_api_sync_github_endpoint_no_token_still_succeeds(client: AsyncClient, auth_headers: dict):
     response = await client.post(
         "/graph/sync/github",
         params={"repo_owner": "org", "repo_name": "repo"},
+        headers=auth_headers,
     )
     assert response.status_code == 200
     data = response.json()

@@ -241,52 +241,47 @@ class TestEnforcerCoordinator:
 # ---------------------------------------------------------------------------
 # API Tests
 # ---------------------------------------------------------------------------
-@pytest_asyncio.fixture
-async def client():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac: yield ac
-
 @pytest.mark.asyncio
-async def test_api_execute(client: AsyncClient):
+async def test_api_execute(client: AsyncClient, auth_headers: dict):
     await _seed_approved_proposal(id="api-enf-1")
-    resp = await client.post("/enforce/execute", json={"proposal_id": "api-enf-1", "executed_by": "tester"})
+    resp = await client.post("/enforce/execute", json={"proposal_id": "api-enf-1", "executed_by": "tester"}, headers=auth_headers)
     assert resp.status_code == 200
     d = resp.json(); assert d["success"] is True
 
 @pytest.mark.asyncio
-async def test_api_execute_missing_id(client: AsyncClient):
-    resp = await client.post("/enforce/execute", json={})
+async def test_api_execute_missing_id(client: AsyncClient, auth_headers: dict):
+    resp = await client.post("/enforce/execute", json={}, headers=auth_headers)
     assert resp.status_code == 400
 
 @pytest.mark.asyncio
-async def test_api_get_enforcement(client: AsyncClient):
+async def test_api_get_enforcement(client: AsyncClient, auth_headers: dict):
     await _seed_approved_proposal(id="api-enf-2")
     rr = await EnforcerCoordinator.enforce(EnforceRequest(proposal_id="api-enf-2"))
     eid = rr.enforcement.id
-    resp = await client.get(f"/enforce/enforcements/{eid}")
+    resp = await client.get(f"/enforce/enforcements/{eid}", headers=auth_headers)
     assert resp.status_code == 200
 
 @pytest.mark.asyncio
-async def test_api_list_enforcements(client: AsyncClient):
-    resp = await client.get("/enforce/enforcements")
+async def test_api_list_enforcements(client: AsyncClient, auth_headers: dict):
+    resp = await client.get("/enforce/enforcements", headers=auth_headers)
     assert resp.status_code == 200
 
 @pytest.mark.asyncio
-async def test_api_config(client: AsyncClient):
-    resp = await client.get("/enforce/config")
+async def test_api_config(client: AsyncClient, auth_headers: dict):
+    resp = await client.get("/enforce/config", headers=auth_headers)
     assert resp.status_code == 200
     d = resp.json(); assert "dry_run_default" in d
 
 @pytest.mark.asyncio
-async def test_api_update_config(client: AsyncClient):
-    resp = await client.put("/enforce/config", json={"dry_run_default": False})
+async def test_api_update_config(client: AsyncClient, auth_headers: dict):
+    resp = await client.put("/enforce/config", json={"dry_run_default": False}, headers=auth_headers)
     assert resp.status_code == 200
     cfg = await EnforcerCoordinator.get_config()
     assert cfg.dry_run_default is False; cfg.dry_run_default = True; await EnforcerCoordinator.update_config(cfg)
 
 @pytest.mark.asyncio
-async def test_api_health(client: AsyncClient):
-    resp = await client.get("/enforce/health")
+async def test_api_health(client: AsyncClient, auth_headers: dict):
+    resp = await client.get("/enforce/health", headers=auth_headers)
     assert resp.status_code == 200
 
 # ---------------------------------------------------------------------------

@@ -123,7 +123,7 @@ async def test_incident_to_pod_edge():
 
 
 @pytest.mark.asyncio
-async def test_incident_api_creates_incident(client: AsyncClient):
+async def test_incident_api_creates_incident(client: AsyncClient, auth_headers: dict):
     pod_id = "pod-api-ns-web-1"
     await Neo4jConnection.run_query(
             "CREATE (n:Pod {id: $id, name: $name, phase: $phase, namespace: $namespace}) RETURN n",
@@ -151,7 +151,7 @@ async def test_incident_api_creates_incident(client: AsyncClient):
         },
     )
 
-    response = await client.get(f"/graph/nodes/{incident_id}")
+    response = await client.get(f"/graph/nodes/{incident_id}", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == incident_id

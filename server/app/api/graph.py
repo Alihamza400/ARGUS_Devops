@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth.dependencies import get_current_user, require_admin, require_engineer, require_viewer
 from app.graph.connection import Neo4jConnection
 from app.graph.schema import (
     NodeType,
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/graph", tags=["graph"])
 
 
 @router.post("/schema/migrate")
-async def run_migrations():
+async def run_migrations(current_user: dict = Depends(require_admin)):
     lines = [l.strip() for l in SCHEMA_MIGRATIONS_CYPHER.split(";") if l.strip()]
     results = []
     for line in lines:
@@ -36,7 +37,7 @@ async def run_migrations():
 
 
 @router.get("/schema")
-async def get_schema():
+async def get_schema(current_user: dict = Depends(require_viewer)):
     return {
         "node_types": {nt.value: NODE_PROPERTIES.get(nt, {}) for nt in NodeType},
         "edge_types": {et.value: EDGE_PROPERTIES.get(et, {}) for et in EdgeType},
@@ -48,7 +49,7 @@ async def get_schema():
 
 
 @router.post("/nodes", response_model=NodeResponse, status_code=201)
-async def create_node(data: NodeCreate):
+async def create_node(data: NodeCreate, current_user: dict = Depends(require_engineer)):
     existing = await Neo4jConnection.run_query(
         "MATCH (n {id: $id}) RETURN n", {"id": data.id}
     )
@@ -74,7 +75,7 @@ def _node_props(record: dict) -> dict:
 
 
 @router.get("/nodes", response_model=list[NodeResponse])
-async def list_nodes(type: str | None = None, limit: int = 100, skip: int = 0):
+async def list_nodes(type: str | None = None, limit: int = 100, skip: int = 0, current_user: dict = Depends(require_viewer)):
     if type:
         type_upper = type.upper()
         if type_upper not in NodeType.__members__:
@@ -95,7 +96,7 @@ async def list_nodes(type: str | None = None, limit: int = 100, skip: int = 0):
 
 
 @router.get("/nodes/{node_id}", response_model=NodeResponse)
-async def get_node(node_id: str):
+async def get_node(node_id: str, current_user: dict = Depends(require_viewer)):
     result = await Neo4jConnection.run_query(
         "MATCH (n {id: $id}) RETURN n, labels(n) AS type", {"id": node_id}
     )
@@ -110,7 +111,7 @@ async def get_node(node_id: str):
 
 
 @router.get("/nodes/{node_id}/subgraph")
-async def get_subgraph(node_id: str, depth: int = 2):
+async def get_subgraph(node_id: str, depth: int = 2, current_user: dict = Depends(require_viewer)):
     query = f"""
     MATCH (n {{id: $node_id}})
     OPTIONAL MATCH path = (n)-[*1..{depth}]-(connected)
@@ -137,14 +138,14 @@ async def get_subgraph(node_id: str, depth: int = 2):
 
 
 @router.delete("/nodes/{node_id}", status_code=204)
-async def delete_node(node_id: str):
+async def delete_node(node_id: str, current_user: dict = Depends(require_admin)):
     await Neo4jConnection.run_query(
         "MATCH (n {id: $id}) DETACH DELETE n", {"id": node_id}
     )
 
 
 @router.post("/edges", response_model=EdgeResponse, status_code=201)
-async def create_edge(data: EdgeCreate):
+async def create_edge(data: EdgeCreate, current_user: dict = Depends(require_engineer)):
     source_exists = await Neo4jConnection.run_query(
         "MATCH (n {id: $id}) RETURN n", {"id": data.source_id}
     )
@@ -206,7 +207,7 @@ async def create_edge(data: EdgeCreate):
 
 
 @router.get("/edges")
-async def list_edges(type: str | None = None, limit: int = 100):
+async def list_edges(type: str | None = None, limit: int = 100, current_user: dict = Depends(require_viewer)):
     if type:
         type_upper = type.upper()
         if type_upper not in EdgeType.__members__:
@@ -242,7 +243,7 @@ async def list_edges(type: str | None = None, limit: int = 100):
 
 
 @router.post("/query", response_model=list[dict])
-async def execute_cypher_query(data: CypherQuery):
+async def execute_cypher_query(data: CypherQuery, current_user: dict = Depends(require_engineer)):
     lowered = data.query.strip().lower()
     if not any(
         keyword in lowered
@@ -269,6 +270,7 @@ async def sync_github_actions(
     workflow_name: str | None = None,
     branch: str | None = None,
     max_runs: int = 50,
+    current_user: dict = Depends(require_engineer),
 ):
     try:
         from app.adapters.github_actions import GitHubActionsAdapter, GitHubActionsConfig
@@ -294,6 +296,7 @@ async def run_sync(
     source: str | None = None,
     repo_name: str | None = None,
     cluster_name: str | None = None,
+    current_user: dict = Depends(require_engineer),
 ):
     results = []
 

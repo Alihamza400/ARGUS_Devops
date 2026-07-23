@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.adapters.webhooks.github import GitHubWebhookHandler
+from app.auth.dependencies import require_viewer
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -31,7 +32,7 @@ async def github_webhook(request: Request):
 
 
 @router.get("/github/verify")
-async def verify_webhook():
+async def verify_webhook(current_user: dict = Depends(require_viewer)):
     secret_configured = len(github_handler.secret) > 0
     return {
         "secret_configured": secret_configured,

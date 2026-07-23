@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
 
 from app.coordinator.coordinator import ConflictCoordinator
 from app.coordinator.models import ProposalRecord, ProposalStatus, ResourceType
@@ -18,7 +17,6 @@ from app.gate.models import (
 from app.gate.policy import ApprovalPolicyEngine
 from app.gate.store import ReviewStore
 from app.graph.connection import Neo4jConnection
-from app.main import app
 
 
 # ---------------------------------------------------------------------------
@@ -407,15 +405,8 @@ class TestReviewEngine:
 # API Endpoint Tests
 # ---------------------------------------------------------------------------
 
-@pytest_asyncio.fixture
-async def client():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-
-
 @pytest.mark.asyncio
-async def test_api_submit_review(client: AsyncClient):
+async def test_api_submit_review(client: AsyncClient, auth_headers: dict):
     await _seed_proposal(id="api-gate-1")
     config = await ReviewStore.get_policy_config()
     config.rules["min_reviewers"] = 1
@@ -430,6 +421,7 @@ async def test_api_submit_review(client: AsyncClient):
             "comment": "Approved via API",
             "evidence_checked": True,
         },
+        headers=auth_headers,
     )
     assert response.status_code == 200
     data = response.json()
@@ -438,16 +430,16 @@ async def test_api_submit_review(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_api_submit_review_missing_fields(client: AsyncClient):
-    response = await client.post("/gate/review", json={})
+async def test_api_submit_review_missing_fields(client: AsyncClient, auth_headers: dict):
+    response = await client.post("/gate/review", json={}, headers=auth_headers)
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
-async def test_api_get_review_status(client: AsyncClient):
+async def test_api_get_review_status(client: AsyncClient, auth_headers: dict):
     await _seed_proposal(id="api-gate-2")
 
-    response = await client.get("/gate/proposals/api-gate-2/status")
+    response = await client.get("/gate/proposals/api-gate-2/status", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["proposal_id"] == "api-gate-2"
@@ -455,24 +447,24 @@ async def test_api_get_review_status(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_api_get_review_status_not_found(client: AsyncClient):
-    response = await client.get("/gate/proposals/nonexistent/status")
+async def test_api_get_review_status_not_found(client: AsyncClient, auth_headers: dict):
+    response = await client.get("/gate/proposals/nonexistent/status", headers=auth_headers)
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_api_list_pending(client: AsyncClient):
+async def test_api_list_pending(client: AsyncClient, auth_headers: dict):
     await _seed_proposal(id="api-gate-3", status=ProposalStatus.PENDING)
 
-    response = await client.get("/gate/pending")
+    response = await client.get("/gate/pending", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["count"] >= 1
 
 
 @pytest.mark.asyncio
-async def test_api_get_policy(client: AsyncClient):
-    response = await client.get("/gate/policy")
+async def test_api_get_policy(client: AsyncClient, auth_headers: dict):
+    response = await client.get("/gate/policy", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert "rules" in data
@@ -480,10 +472,11 @@ async def test_api_get_policy(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_api_update_policy(client: AsyncClient):
+async def test_api_update_policy(client: AsyncClient, auth_headers: dict):
     response = await client.put(
         "/gate/policy",
         json={"rules": {"min_reviewers": 3, "no_self_approval": True}},
+        headers=auth_headers,
     )
     assert response.status_code == 200
     data = response.json()
