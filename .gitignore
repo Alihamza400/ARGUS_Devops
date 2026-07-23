@@ -8,6 +8,9 @@ build/
 .env
 neo4j-data/
 *.log
+.coverage
+coverage.xml
+htmlcov/
 .DS_Store
 .vscode/
 .idea/
