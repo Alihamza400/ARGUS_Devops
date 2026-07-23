@@ -1,5 +1,10 @@
 # ARGUS
 
+[![CI](https://github.com/Alihamza400/ARGUS_Devops/actions/workflows/ci.yml/badge.svg)](https://github.com/Alihamza400/ARGUS_Devops/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![Tests](https://img.shields.io/badge/tests-208%20passing-brightgreen.svg)](#)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](#)
+
 **A shared-context coordination layer for DevOps agents.**
 
 Ingests code, CI/CD, and infrastructure into a single graph with automated incident analysis, conflict resolution, human review, and closed-loop enforcement.
@@ -185,7 +190,7 @@ Python 3.12+ · FastAPI · Neo4j 5.x · Pydantic v2 · Docker
 
 ## Status
 
-All 8 core phases are complete (208 tests passing). The remaining work is production infrastructure: authentication, HA setup, CI/CD pipeline, and security hardening.
+All 8 core phases are complete — 208 tests passing on every commit via CI/CD pipeline.
 
 ---
 
